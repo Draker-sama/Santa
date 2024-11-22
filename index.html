@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Énigme Musicale</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+
+        .music-container {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+
+        .solved {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        audio {
+            width: 100%;
+        }
+
+        input {
+            width: calc(100% - 20px);
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        input:disabled {
+            background-color: #e9ecef;
+            color: #495057;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #6c757d;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+
+        p {
+            margin: 10px 0;
+        }
+
+        #success-message {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            background-color: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <h1>Énigme Musicale</h1>
+    <p>Écoutez les extraits ci-dessous et entrez le titre correct pour chaque chanson :</p>
+
+    <div id="music-list"></div>
+
+    <!-- Message de succès -->
+    <div id="success-message">
+        <h2>Félicitations ! 🎉</h2>
+        <p>Vous avez résolu toutes les énigmes. Le code du cadenas est :</p>
+        <p style="font-size: 24px; font-weight: bold;">1234</p>
+    </div>
+
+    <script>
+        const musiques = [
+            { id: 1, fichier: "extrait1.mp3", reponse: "goodbye" },
+            { id: 2, fichier: "extrait2.mp3", reponse: "what could have been" },
+            { id: 3, fichier: "extrait3.mp3", reponse: "to ashes and blood" }
+        ];
+
+        let solvedCount = 0; // Compte le nombre de musiques résolues
+        const players = []; // Stocke les lecteurs audio
+
+        function initMusiques() {
+            const musicList = document.getElementById('music-list');
+            musiques.forEach((musique) => {
+                const container = document.createElement('div');
+                container.id = `music-${musique.id}`;
+                container.className = 'music-container';
+
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = musique.fichier;
+
+                // Ajoute un événement pour gérer la lecture
+                audio.addEventListener('play', () => pauseAllExcept(audio));
+                players.push(audio); // Ajoute le lecteur à la liste
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = 'Entrez le titre ici';
+                input.id = `input-${musique.id}`;
+
+                const button = document.createElement('button');
+                button.innerText = 'Valider';
+                button.onclick = () => verifierReponse(musique.id);
+
+                const feedback = document.createElement('p');
+                feedback.id = `feedback-${musique.id}`;
+
+                container.appendChild(audio);
+                container.appendChild(input);
+                container.appendChild(button);
+                container.appendChild(feedback);
+
+                musicList.appendChild(container);
+            });
+        }
+
+        // Met en pause tous les autres lecteurs sauf le lecteur actuellement lu
+        function pauseAllExcept(currentPlayer) {
+            players.forEach((player) => {
+                if (player !== currentPlayer) {
+                    player.pause();
+                }
+            });
+        }
+
+        // Calcul de la similarité entre deux chaînes
+        function similarite(str1, str2) {
+            const distance = levenshtein(str1.toLowerCase(), str2.toLowerCase());
+            const longueurMax = Math.max(str1.length, str2.length);
+            return (1 - distance / longueurMax) * 100;
+        }
+
+        // Distance de Levenshtein
+        function levenshtein(a, b) {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) {
+                matrix[i] = [i];
+            }
+            for (let j = 0; j <= a.length; j++) {
+                matrix[0][j] = j;
+            }
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1, // substitution
+                            matrix[i][j - 1] + 1,     // insertion
+                            matrix[i - 1][j] + 1      // suppression
+                        );
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function verifierReponse(id) {
+            const musique = musiques.find((m) => m.id === id);
+            const input = document.getElementById(`input-${id}`);
+            const feedback = document.getElementById(`feedback-${id}`);
+            const container = document.getElementById(`music-${id}`);
+
+            const similariteScore = similarite(input.value, musique.reponse);
+
+            if (similariteScore >= 70) {
+                if (!container.classList.contains('solved')) {
+                    solvedCount++;
+                }
+                feedback.innerText = 'Bonne réponse !';
+                feedback.style.color = 'green';
+                container.classList.add('solved');
+
+                // Met à jour la case avec la bonne réponse et désactive le champ
+                input.value = musique.reponse;
+                input.disabled = true;
+
+                if (solvedCount === musiques.length) {
+                    afficherMessageDeSucces();
+                }
+            } else {
+                feedback.innerText = 'Mauvaise réponse, essayez encore.';
+                feedback.style.color = 'red';
+            }
+        }
+
+        function afficherMessageDeSucces() {
+            const successMessage = document.getElementById('success-message');
+            successMessage.style.display = 'block';
+        }
+
+        window.onload = initMusiques;
+    </script>
+</body>
+</html>
